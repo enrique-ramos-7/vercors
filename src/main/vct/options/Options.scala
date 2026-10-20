@@ -468,6 +468,26 @@ case object Options {
       arg[PathOrStd]("<path>...").unbounded().optional()
         .action((path, c) => c.copy(inputs = c.inputs :+ path))
         .text("List of input files to process"),
+      note("Infer mode"),
+      opt[Unit]("infer").action((_, c) => c.copy(mode = Mode.Infer))
+        .text("Infers contracts using tricera.").children(
+          opt[Path]("infer-output").valueName("<path>")
+            .action((path, c) => c.copy(inferOutput = Some(path)))
+            .text("Specify output file"),
+          opt[Path]("infer-tri").valueName("<path>")
+            .action((path, c) => c.copy(isarOutput = Some(path)))
+            .text("Tricera path"),
+          opt[Unit]("infer-verbose")
+            .action((_, c) => c.copy(inferVerbose = true))
+            .text("Verbose printing"),
+          opt[Unit]("infer-loop")
+            .action((_, c) => c.copy(inferLoopContracts = true))
+            .text("Infer loop contracts"),
+          opt[Unit]("infer-globals")
+            .action((_, c) => c.copy(inferInitGlobals = true))
+            .text("Non-deterministically initialise globals for inference"),
+        ),
+        
     )
 
     (parser, tags.toMap)
@@ -598,6 +618,15 @@ case class Options(
 
     // Pallas options
     contractImportFile: Option[PathOrStd] = None,
+
+    // Infer options
+    inferOutput: Option[Path] = None,
+    inferTriPath: Option[Path] = Some(Path.of("tri")),
+    inferVerbose: Boolean = false,
+    inferLoopContracts: Boolean = false,
+    inferInitGlobals: Boolean = false,
+
+
 ) {
   def getParserDebugOptions: vct.parsers.debug.DebugOptions =
     vct.parsers.debug.DebugOptions(

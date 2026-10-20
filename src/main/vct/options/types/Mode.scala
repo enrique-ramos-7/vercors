@@ -13,4 +13,5 @@ case object Mode {
   case object Isar extends Mode
   case object Patcher extends Mode
   case object LSP extends Mode
+  case object Infer extends Mode
 }
