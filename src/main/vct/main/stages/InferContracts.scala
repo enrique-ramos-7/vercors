@@ -307,7 +307,7 @@ class InferContracts(
 
     val ret: String =
       if (newPerms.isEmpty) replaced
-      else newPerms.mkString("","\n","\n") + replaced 
+      else replaced.replace("/*@",newPerms.mkString("/*@\n","\n","\n"))
     ret
   }
   
