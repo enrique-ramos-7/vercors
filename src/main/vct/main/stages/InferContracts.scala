@@ -433,7 +433,12 @@ class InferContracts(
 
   def cleanPredicates(oldReplacements: Seq[(String,String)], s: String): String = {
     val oldReplaced = oldReplacements.foldLeft(s) { case (acc, (old, replacement)) =>acc.replace(old, replacement)}
-    oldReplaced.replaceAll("""\btrue\b""","(1 != 0)").replaceAll("""\bnull\b""","0").replaceAll("""\\result\b""","main_result")
+    oldReplaced.replaceAll("""\btrue\b""","(1 != 0)")
+      .replaceAll("""\bnull\b""","0")
+      .replaceAll("""\\result\b""","main_result")
+      .replaceAll("""\\pointer_index\(([^,()]+?), [^,()]+, [^()]*\)""", "($1 != 0)")
+
+
     
   }
 
