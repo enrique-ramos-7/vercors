@@ -289,27 +289,23 @@ class InferContracts(
     })
   }
 
-  def fixAcslValid(contract: String): String = {
-    val valid = """"[^"]*"|\\valid\(([\w->*.]+)\)""".r
+def fixAcslValid(contract: String): String = {
+  val valid = """\\valid\(([\w->*.]+)\)""".r
+  val newPerms = scala.collection.mutable.LinkedHashSet[String]()
 
-    val newPerms: ArrayBuffer[String] = ArrayBuffer()
-    val replaced: String = valid.replaceAllIn(contract, m => {
-      if (m.group(1) != null) {
-
-        val perm: String = s"Perm(${m.group(1)},1)"
-        if(!contract.contains(s"requires $perm;") && ! newPerms.contains(s"requires $perm;"))
-          newPerms += s"requires $perm;"
-
-        Regex.quoteReplacement(s"(${m.group(1)} != NULL)")
-      }  
-      else m.matched 
+  val body = contract.split("\n", -1).map { line =>
+    val t = line.trim
+    val kind = if (t.startsWith("requires")) "requires" else if (t.startsWith("ensures")) "ensures" else ""
+    if (kind.isEmpty) line
+    else valid.replaceAllIn(line, m => {
+      newPerms += s"$kind \\pointer_index(${m.group(1)},0,write);"
+      java.util.regex.Matcher.quoteReplacement(s"(${m.group(1)} != NULL)")
     })
+  }.mkString("\n")
 
-    val ret: String =
-      if (newPerms.isEmpty) replaced
-      else replaced.replace("/*@",newPerms.mkString("/*@\n","\n","\n"))
-    ret
-  }
+  val toAdd = newPerms.filterNot(body.contains)
+  if (toAdd.isEmpty) body else body.replace("/*@", "/*@\n" + toAdd.mkString("\n") + "\n")
+}
   
   def fixAcslOld(contract: String): String = {
     val old = """"[^"]*"|\\old\((\w+)\)\.(\w+)""".r
@@ -365,7 +361,7 @@ class InferContracts(
   def mergeContracts(inferredContractStarts: Seq[(String,Int,String)], lines: ArrayBuffer[String]): ArrayBuffer[String] = {
       inferredContractStarts.sortBy(_._2)(Ordering.Int.reverse).foldLeft(lines){
           case (result, ("func", start, contract)) =>
-            //logger.info(s"Merging $contract at $start ")
+            logger.info(s"Merging $contract at $start ")
             mergeFuncContract(contract, start, result)          
           case (result, ("loop", start, contract)) =>
             //logger.info(s"Merging $contract at $start ")
@@ -373,35 +369,37 @@ class InferContracts(
       }
       
   } 
+def mergeFuncContract(contract: String, start: Int, lines: ArrayBuffer[String]): ArrayBuffer[String] = {
+  if (lines(start).contains("/*@")) {
+    val contractLines = contract.linesIterator.map(_.trim).toSeq
+    val requires = contractLines.filter(_.startsWith("requires"))
+    val ensures  = contractLines.filter(_.startsWith("ensures"))
 
-  def mergeFuncContract(contract: String, start: Int, lines: ArrayBuffer[String]): ArrayBuffer[String] = {
-      if (lines(start).contains("/*@")) {
-        val requires: String = contract.linesIterator.map(_.trim).find(_.startsWith("requires")).get
-        val ensures: String = contract.linesIterator.map(_.trim).find(_.startsWith("ensures")).get
-        
-        val contractLength = lines.view.drop(start+1).indexWhere(_.contains("*/")) + 1
-        val requiresEnd = lines.view.drop(start+1).take(contractLength - 1).lastIndexWhere(_.contains("requires"))
-        val ensuresStart = lines.view.drop(start+1).take(contractLength - 1).indexWhere(_.contains("ensures"))
-        val ensuresEnd = lines.view.drop(start+1).take(contractLength - 1).lastIndexWhere(_.contains("ensures"))
+    val bodyStart = start + 1
+    val closeIdx  = lines.indexWhere(_.contains("*/"), bodyStart) 
+    val body      = lines.slice(bodyStart, closeIdx)
 
-        val requiresInsert =
-          if (requiresEnd >= 0) requiresEnd + 1
-          else if (ensuresStart >= 0) ensuresStart
-          else contractLength - 1
-        
-        val ensuresInsert =
-          if (ensuresStart >= 0) ensuresEnd + 1
-          else contractLength - 1
+    val lastRequires  = body.lastIndexWhere(_.trim.startsWith("requires"))
+    val firstEnsures  = body.indexWhere(_.trim.startsWith("ensures"))
+    val lastEnsures   = body.lastIndexWhere(_.trim.startsWith("ensures"))
 
-        lines.insert(start + requiresInsert + 1,requires)
-        lines.insert(start + ensuresInsert + 2,ensures)
+    val requiresInsert =
+      if (lastRequires >= 0) bodyStart + lastRequires + 1
+      else if (firstEnsures >= 0) bodyStart + firstEnsures
+      else closeIdx
 
-      } else {
-        lines.insert(start, contract)
-      }
+    val ensuresInsert =
+      if (lastEnsures >= 0) bodyStart + lastEnsures + 1
+      else closeIdx
 
-      lines
+    lines.insertAll(math.max(ensuresInsert, requiresInsert), ensures)
+    lines.insertAll(requiresInsert, requires)
+  } else {
+    lines.insert(start, contract)
   }
+
+  lines
+}
 
     def mergeLoopContract(contract: String, start: Int, lines: ArrayBuffer[String]): ArrayBuffer[String] = {
       if (lines(start).contains("//@")) {
