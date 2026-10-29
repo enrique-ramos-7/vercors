@@ -1,6 +1,6 @@
 package vct.col.rewrite
 
-import vct.col.ast.{DerefPointer, DerefHeapVariable, HeapLocal, Expr, Star, Perm, And, PointerType, Type, TNonNullPointer, TNonNullConstPointer}
+import vct.col.ast.{DerefPointer, DerefHeapVariable, HeapLocal, Expr, Star, Perm, And, PointerType, Type, TNonNullPointer, TNonNullConstPointer, BooleanValue}
 import vct.col.rewrite.NonLatchingRewriter
 
 
@@ -18,6 +18,7 @@ case class CleanForPrinting[G]() extends NonLatchingRewriter[G,G] {
         case (l,Perm(_,_)) => l
         case (l, r) => And(l,r)(s.o)
       }
+      case p @ Perm(_,_) => new BooleanValue[G](true)(p.o) 
       case e => e.rewriteDefault()
     }
 
