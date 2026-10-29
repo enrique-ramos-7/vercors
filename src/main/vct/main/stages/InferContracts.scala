@@ -296,8 +296,8 @@ class InferContracts(
     val replaced: String = valid.replaceAllIn(contract, m => {
       if (m.group(1) != null) {
 
-        val perm: String = s"Perm(*${m.group(1)},1)"
-        if(!contract.contains(s"requires $perm;"))
+        val perm: String = s"Perm(${m.group(1)},1)"
+        if(!contract.contains(s"requires $perm;") && ! newPerms.contains(s"requires $perm;"))
           newPerms += s"requires $perm;"
 
         Regex.quoteReplacement(s"(${m.group(1)} != NULL)")
