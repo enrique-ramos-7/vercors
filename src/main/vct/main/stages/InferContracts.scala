@@ -76,8 +76,8 @@ class InferContracts(
      val main:  Procedure[G] = program.declarations.collectFirst{case node: Procedure[G] if node.o.getPreferredNameOrElse().snake == "main" => node}
      .getOrElse(throw new NoSuchElementException("Missing input!"))
      
-     val contractStarts: Seq[(String,Int)] = funcs.map {
-        case f: Procedure[G] => (getRealName(f), f.o.findAll[PositionRange].last.startLineIdx)
+     val contractStarts: Seq[(String,Int)] = funcs.collect {
+        case f: Procedure[G] if !getRealName(f).startsWith("__vercors_") => (getRealName(f), f.o.findAll[PositionRange].last.startLineIdx)
       }
 
      val loopStarts: ArrayBuffer[(Int,Int)] = (program.collect { case l: Loop[G] => 
@@ -85,7 +85,7 @@ class InferContracts(
         ((start,start))
      }).to(ArrayBuffer)
 
-     //logger.info(contractStarts.map{case (name,start) => s"($name, $start)"}.mkString(","))
+//     logger.info(contractStarts.map{case (name,start) => s"($name, $start)"}.mkString(","))
 
      val inputPath: Path = inputs(0).underlyingPath.getOrElse {
        throw new IllegalArgumentException(
