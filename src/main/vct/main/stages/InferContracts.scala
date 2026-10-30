@@ -362,7 +362,7 @@ def fixAcslValid(contract: String): String = {
       inferredContractStarts.sortBy(_._2)(Ordering.Int.reverse).foldLeft(lines){
           case (result, ("func", start, contract)) =>
             logger.info(s"Merging $contract at $start ")
-            mergeFuncContract(contract, start, result)          
+            //mergeFuncContract(contract, start, result)          
           case (result, ("loop", start, contract)) =>
             //logger.info(s"Merging $contract at $start ")
             mergeLoopContract(contract, start, result)          
