@@ -95,8 +95,10 @@ class InferContracts(
     
      // We replace the names in ctx (which are normalised) with the original names 
      val ctx = getNamedCtx(program)
-     
+    //logger.info(loopStarts.map{case (name,start) => s"($name, $start)"}.mkString(","))
+    
      val harness: ArrayBuffer[String] = genHarness(ctx,main,removeContracts(contractStarts,loopStarts,getSource(inputPath))) 
+     //logger.info(loopStarts.map{case (name,start) => s"($name, $start)"}.mkString(","))
 
      Files.write(Paths.get(s"harness_${inputPath.getFileName}"), harness.asJava, StandardCharsets.UTF_8)
     
@@ -201,10 +203,10 @@ class InferContracts(
   def getLoopStarts[G](program: Program[G], loopStarts: Seq[(Int,Int)], inferred: Seq[(String,String,String)], ctx: Ctx): Seq[(String,Int,String)]  = {
     val loopStartsMap: Map[Int,Int] = loopStarts.toMap
     val inferredLoopStarts: Seq[(String,Int,String)] = getLoopInferred(inferred).collect {
-      case (sort,name,contract) if loopStartsMap.contains(name.split("_").last.toInt + - 2) => 
-        val start = loopStartsMap(name.split("_").last.toInt - 2)
+      case (sort,name,contract) if loopStartsMap.contains(name.split("_").last.toInt + - 1) => 
+        val start = loopStartsMap(name.split("_").last.toInt - 1)
         (sort,start,loopToVc(program,start,contract,ctx))
-    } // -2 Because line number from tricera is one ahead, plus we are zero indexed so plus another 1
+    } // -1 Because we are zero indexed
     //logger.info(inferredLoopStarts.map{case (sort,start,contract) => s"($sort, $start, $contract)"}.mkString(","))
     inferredLoopStarts
   }
@@ -316,6 +318,7 @@ def fixAcslValid(contract: String): String = {
   }
 
   def removeContracts(contractStarts: Seq[(String,Int)], loopStarts: ArrayBuffer[(Int,Int)], lines: ArrayBuffer[String]): ArrayBuffer[String] = {
+      offsetLoopStarts(loopStarts, lines)
       contractStarts.sortBy(_._2)(Ordering.Int.reverse).foldLeft(lines){
           case (result, (name, start)) =>
             
@@ -357,7 +360,22 @@ def fixAcslValid(contract: String): String = {
     case (current, original) if current >= start => (current + change, original)
     case other => other
   }
+
+  def offsetLoopStarts(loopStarts: ArrayBuffer[(Int, Int)], lines: ArrayBuffer[String]): Unit = {
+    val loopRegex = """\b(for|while)\b""".r
     
+
+    for (i <- loopStarts.indices) {
+      var (current, original) = loopStarts(i)
+
+      while (current < lines.length && !loopRegex.findFirstIn(lines(current).trim).isDefined) {
+        current += 1
+      }
+
+      if (current < lines.length) loopStarts(i) = (current, original)
+    }
+  }
+
   def mergeContracts(inferredContractStarts: Seq[(String,Int,String)], lines: ArrayBuffer[String]): ArrayBuffer[String] = {
       inferredContractStarts.sortBy(_._2)(Ordering.Int.reverse).foldLeft(lines){
           case (result, ("func", start, contract)) =>
@@ -409,7 +427,7 @@ def mergeFuncContract(contract: String, start: Int, lines: ArrayBuffer[String]):
         val contractLength = lines.view.drop(start+1).indexWhere(line => !line.contains("*/")) + 1
 
         lines.insert(start + contractLength,invariants.mkString)
-        lines.insert(start,ghostLines.mkString)
+        lines.insert(start,ghostLines.mkString("\n"))
 
       } else {
         lines.insert(start, contract)
